@@ -1014,12 +1014,12 @@ impl Renderer for PosixRenderer {
                 .push_str(&highlighter.highlight_prompt(prompt, default_prompt));
             // display the input line
             self.buffer
-                .push_str(&highlighter.highlight(line, line.pos()));
+                .push_str(&highlighter.highlight(line.printable(), line.pos()));
         } else {
             // display the prompt
             self.buffer.push_str(prompt);
             // display the input line
-            self.buffer.push_str(line);
+            self.buffer.push_str(line.printable());
         }
         // display hint
         if let Some(hint) = hint {

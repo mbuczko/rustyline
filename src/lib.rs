@@ -34,6 +34,7 @@ mod keys;
 mod kill_ring;
 mod layout;
 pub mod line_buffer;
+pub mod overlay;
 #[cfg(feature = "with-sqlite-history")]
 pub mod sqlite_history;
 mod tty;
@@ -45,10 +46,11 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::result;
 
+use edit::Overlay;
 use log::debug;
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
-pub use rustyline_derive::{Completer, Helper, Highlighter, Hinter, Validator};
+pub use rustyline_derive::{Completer, Helper, Highlighter, Hinter, Overlayer, Validator};
 
 use crate::tty::{Buffer, RawMode, RawReader, Renderer, Term, Terminal};
 
@@ -66,10 +68,10 @@ use crate::keymap::{Bindings, InputState, Refresher};
 pub use crate::keys::{KeyCode, KeyEvent, Modifiers};
 use crate::kill_ring::KillRing;
 use crate::layout::{swidth, Unit};
+use crate::overlay::Overlayer;
 pub use crate::tty::ExternalPrinter;
 pub use crate::undo::Changeset;
 use crate::validate::Validator;
-
 /// The error type for I/O and Linux Syscalls (Errno)
 pub type Result<T> = result::Result<T, ReadlineError>;
 
@@ -545,7 +547,7 @@ fn readline_direct(
 /// (parse current line once)
 pub trait Helper
 where
-    Self: Completer + Hinter + Highlighter + Validator,
+    Self: Completer + Hinter + Highlighter + Validator + Overlayer,
 {
 }
 
@@ -585,6 +587,7 @@ impl<'h> Context<'h> {
 pub struct Editor<H: Helper, I: History> {
     term: Terminal,
     buffer: Option<Buffer>,
+    overlay: Option<Overlay>,
     history: I,
     helper: Option<H>,
     kill_ring: KillRing,
@@ -621,6 +624,7 @@ impl<H: Helper, I: History> Editor<H, I> {
         Ok(Self {
             term,
             buffer: None,
+            overlay: None,
             history,
             helper: None,
             kill_ring: KillRing::new(60),
@@ -692,8 +696,8 @@ impl<H: Helper, I: History> Editor<H, I> {
 
         self.kill_ring.reset(); // TODO recreate a new kill ring vs reset
         let ctx = Context::new(&self.history);
-        let mut s = State::new(&mut stdout, prompt, self.helper.as_ref(), ctx);
 
+        let mut s = State::new(&mut stdout, prompt, self.overlay, self.helper.as_ref(), ctx);
         let mut input_state = InputState::new(&self.config, &self.custom_bindings);
 
         if let Some((left, right)) = initial {
@@ -795,6 +799,7 @@ impl<H: Helper, I: History> Editor<H, I> {
             let _ = original_mode; // silent warning
         }
         self.buffer = rdr.unbuffer();
+        self.overlay = s.prompt_overlay();
         Ok(s.line.into_string())
     }
 

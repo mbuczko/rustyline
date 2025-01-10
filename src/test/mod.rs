@@ -8,6 +8,7 @@ use crate::hint::Hinter;
 use crate::history::History;
 use crate::keymap::{Bindings, Cmd, InputState};
 use crate::keys::{KeyCode as K, KeyEvent, KeyEvent as E, Modifiers as M};
+use crate::overlay::Overlayer;
 use crate::tty::Sink;
 use crate::validate::Validator;
 use crate::{apply_backspace_direct, readline_direct, Context, DefaultEditor, Helper, Result};
@@ -54,7 +55,11 @@ impl Hinter for SimpleCompleter {
         None
     }
 }
-
+impl Overlayer for SimpleCompleter {
+    fn overlay_str(&self, _ch: Option<char>) -> Option<&'static str> {
+        None
+    }
+}
 impl Helper for SimpleCompleter {}
 impl Highlighter for SimpleCompleter {}
 impl Validator for SimpleCompleter {}

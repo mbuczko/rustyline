@@ -92,6 +92,9 @@ required-features = ["derive"]
 name = "example"
 required-features = ["custom-bindings", "derive"]
 [[example]]
+name = "overlays"
+required-features = ["custom-bindings", "derive"]
+[[example]]
 name = "input_multiline"
 required-features = ["custom-bindings", "derive"]
 [[example]]

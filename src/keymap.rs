@@ -389,6 +389,8 @@ pub trait Refresher {
     fn last_insert(&self) -> Option<String>;
     /// Returns `true` if the cursor is currently at the end of the line.
     fn is_cursor_at_end(&self) -> bool;
+    /// Returns first character of the line
+    fn starting_char(&self) -> Option<char>;
     /// Returns `true` if there is a hint displayed.
     fn has_hint(&self) -> bool;
     /// Returns the hint text that is shown after the current cursor position.

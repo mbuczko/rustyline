@@ -15,10 +15,13 @@ use crate::layout::{cwidh, Layout, Position};
 use crate::line_buffer::{
     ChangeListener, DeleteListener, Direction, LineBuffer, NoListener, WordAction, MAX_LINE,
 };
+use crate::overlay::Overlayer;
 use crate::tty::{Renderer, Term, Terminal};
 use crate::undo::Changeset;
 use crate::validate::{ValidationContext, ValidationResult};
 use crate::KillRing;
+
+pub type Overlay = (char, &'static str, Position);
 
 /// Represent the state during line editing.
 /// Implement rendering.
@@ -26,7 +29,8 @@ pub struct State<'out, 'prompt, H: Helper> {
     pub out: &'out mut <Terminal as Term>::Writer,
     prompt: &'prompt str,  // Prompt to display (rl_prompt)
     prompt_size: Position, // Prompt Unicode/visible width and height
-    pub line: LineBuffer,  // Edited line buffer
+    prompt_overlay: Option<Overlay>,
+    pub line: LineBuffer, // Edited line buffer
     pub layout: Layout,
     saved_line_for_history: LineBuffer, // Current edited line before history browsing
     byte_buffer: [u8; 4],
@@ -47,6 +51,7 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
     pub fn new(
         out: &'out mut <Terminal as Term>::Writer,
         prompt: &'prompt str,
+        prompt_overlay: Option<Overlay>,
         helper: Option<&'out H>,
         ctx: Context<'out>,
     ) -> Self {
@@ -55,7 +60,10 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
             out,
             prompt,
             prompt_size,
-            line: LineBuffer::with_capacity(MAX_LINE).can_growth(true),
+            prompt_overlay,
+            line: LineBuffer::with_capacity(MAX_LINE)
+                .can_growth(true)
+                .set_lead_char(prompt_overlay.map(|ov| ov.0)),
             layout: Layout::default(),
             saved_line_for_history: LineBuffer::with_capacity(MAX_LINE).can_growth(true),
             byte_buffer: [0; 4],
@@ -73,6 +81,14 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         } else {
             None
         }
+    }
+
+    pub fn overlayer(&self) -> Option<&dyn Overlayer> {
+        self.helper.map(|h| h as &dyn Overlayer)
+    }
+
+    pub fn prompt_overlay(&self) -> Option<Overlay> {
+        self.prompt_overlay
     }
 
     pub fn next_cmd(
@@ -120,19 +136,24 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
     }
 
     pub fn move_cursor(&mut self, kind: CmdKind) -> Result<()> {
+        let prompt_size = self
+            .prompt_overlay
+            .map(|ov| ov.2)
+            .unwrap_or(self.prompt_size);
+
         // calculate the desired position of the cursor
         let cursor = self
             .out
-            .calculate_position(&self.line[..self.line.pos()], self.prompt_size);
+            .calculate_position(self.line.printable_to(self.line.pos()), prompt_size);
+
         if self.layout.cursor == cursor {
             return Ok(());
         }
         if self.highlight_char(kind) {
-            let prompt_size = self.prompt_size;
             self.refresh(self.prompt, prompt_size, true, Info::NoHint)?;
         } else {
             self.out.move_cursor(self.layout.cursor, cursor)?;
-            self.layout.prompt_size = self.prompt_size;
+            self.layout.prompt_size = prompt_size;
             self.layout.cursor = cursor;
             debug_assert!(self.layout.prompt_size <= self.layout.cursor);
             debug_assert!(self.layout.cursor <= self.layout.end);
@@ -171,14 +192,35 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
             None
         };
 
-        let new_layout = self
-            .out
-            .compute_layout(prompt_size, default_prompt, &self.line, info);
+        let leadchr = self.starting_char();
+        let overlay = match self.overlayer() {
+            Some(prompter) => prompter.overlay_str(leadchr),
+            _ => None,
+        };
+
+        // calculate overlay size. use previous version if possible.
+        let overlay_size = match overlay {
+            Some(_) if self.prompt_overlay.map(|po| po.0) == leadchr => {
+                self.prompt_overlay.unwrap().2
+            }
+            Some(ov) => self.out.calculate_position(ov, Position::default()),
+            _ => prompt_size,
+        };
+
+        self.line.set_printable_idx(overlay.is_some() as usize);
+        self.prompt_overlay = overlay.map(|ov| (leadchr.unwrap(), ov, overlay_size));
+
+        let new_layout = self.out.compute_layout(
+            self.prompt_overlay.map(|ov| ov.2).unwrap_or(prompt_size),
+            default_prompt & overlay.is_none(),
+            &self.line,
+            info,
+        );
 
         debug!(target: "rustyline", "old layout: {:?}", self.layout);
         debug!(target: "rustyline", "new layout: {:?}", new_layout);
         self.out.refresh_line(
-            prompt,
+            overlay.unwrap_or(prompt),
             &self.line,
             info,
             &self.layout,
@@ -186,7 +228,6 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
             highlighter,
         )?;
         self.layout = new_layout;
-
         Ok(())
     }
 
@@ -260,10 +301,9 @@ impl<H: Helper> Invoke for State<'_, '_, H> {
 
 impl<H: Helper> Refresher for State<'_, '_, H> {
     fn refresh_line(&mut self) -> Result<()> {
-        let prompt_size = self.prompt_size;
         self.hint();
         self.highlight_char(CmdKind::Other);
-        self.refresh(self.prompt, prompt_size, true, Info::Hint)
+        self.refresh(self.prompt, self.prompt_size, false, Info::Hint)
     }
 
     fn refresh_line_with_msg(&mut self, msg: Option<&str>, kind: CmdKind) -> Result<()> {
@@ -310,6 +350,10 @@ impl<H: Helper> Refresher for State<'_, '_, H> {
 
     fn pos(&self) -> usize {
         self.line.pos()
+    }
+
+    fn starting_char(&self) -> Option<char> {
+        self.line.chars().nth(0)
     }
 
     fn external_print(&mut self, msg: String) -> Result<()> {
@@ -752,6 +796,7 @@ pub fn init_state<'out, H: Helper>(
         out,
         prompt: "",
         prompt_size: Position::default(),
+        prompt_overlay: None,
         line: LineBuffer::init(line, pos),
         layout: Layout::default(),
         saved_line_for_history: LineBuffer::with_capacity(100),

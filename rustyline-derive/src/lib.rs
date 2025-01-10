@@ -205,3 +205,33 @@ pub fn validator_macro_derive(input: TokenStream) -> TokenStream {
     };
     TokenStream::from(expanded)
 }
+
+#[proc_macro_derive(Overlayer, attributes(rustyline))]
+pub fn overlayer_macro_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let generics = input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let expanded = if let Some((index, field)) = get_field_by_attr(&input.data, "Overlayer") {
+        let field_name_or_index = field_name_or_index_token(index, field);
+
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics ::rustyline::overlay::Overlayer for #name #ty_generics #where_clause {
+                fn overlay_str(
+                    &self,
+                    ch: Option<char>,
+                ) -> Option<&'static str> {
+                    ::rustyline::overlay::Overlayer::overlay_str(&self.#field_name_or_index, ch)
+                }
+            }
+        }
+    } else {
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics ::rustyline::overlay::Overlayer for #name #ty_generics #where_clause {
+            }
+        }
+    };
+    TokenStream::from(expanded)
+}

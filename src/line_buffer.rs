@@ -76,6 +76,7 @@ impl ChangeListener for NoListener {
 pub struct LineBuffer {
     buf: String,      // Edited line buffer (rl_line_buffer)
     pos: usize,       // Current cursor position (byte position) (rl_point)
+    start: usize,     // What index to start printing buf from
     can_growth: bool, // Whether to allow dynamic growth
 }
 
@@ -95,6 +96,7 @@ impl LineBuffer {
         Self {
             buf: String::with_capacity(capacity),
             pos: 0,
+            start: 0,
             can_growth: false,
         }
     }
@@ -103,6 +105,19 @@ impl LineBuffer {
     pub(crate) fn can_growth(mut self, can_growth: bool) -> Self {
         self.can_growth = can_growth;
         self
+    }
+
+    pub(crate) fn set_lead_char(mut self, ch: Option<char>) -> Self {
+        if let Some(ch) = ch {
+            self.buf.insert(0, ch);
+            self.set_printable_idx(1);
+            self.set_pos(1);
+        }
+        self
+    }
+
+    pub(crate) fn set_printable_idx(&mut self, idx: usize) {
+        self.start = idx;
     }
 
     fn must_truncate(&self, new_len: usize) -> bool {
@@ -127,6 +142,16 @@ impl LineBuffer {
     #[must_use]
     pub fn into_string(self) -> String {
         self.buf
+    }
+
+    /// Returns printable slice of buf
+    pub fn printable(&self) -> &str {
+        &self.buf[self.start..]
+    }
+
+    /// Returns printable slice of buf up until pos
+    pub fn printable_to(&self, pos: usize) -> &str {
+        &self.buf[self.start..pos.max(self.start)]
     }
 
     /// Current cursor position (byte position)
@@ -177,11 +202,11 @@ impl LineBuffer {
     }
 
     fn start_of_line(&self) -> usize {
-        if let Some(i) = self.buf[..self.pos].rfind('\n') {
+        if let Some(i) = self.buf[self.start..self.pos].rfind('\n') {
             // `i` is before the new line, e.g. at the end of the previous one.
             i + 1
         } else {
-            0
+            self.start
         }
     }
 

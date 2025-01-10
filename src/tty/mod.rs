@@ -71,7 +71,7 @@ pub trait Renderer {
     ) -> Layout {
         // calculate the desired position of the cursor
         let pos = line.pos();
-        let cursor = self.calculate_position(&line[..pos], prompt_size);
+        let cursor = self.calculate_position(line.printable_to(pos), prompt_size);
         // calculate the position of the end of the input line
         let mut end = if pos == line.len() {
             cursor
