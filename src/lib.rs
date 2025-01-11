@@ -557,15 +557,17 @@ impl Helper for () {}
 pub struct Context<'h> {
     history: &'h dyn History,
     history_index: usize,
+    overlay_ch: Option<char>,
 }
 
 impl<'h> Context<'h> {
     /// Constructor. Visible for testing.
     #[must_use]
-    pub fn new(history: &'h dyn History) -> Self {
+    pub fn new(history: &'h dyn History, overlay_ch: Option<char>) -> Self {
         Self {
             history,
             history_index: history.len(),
+            overlay_ch,
         }
     }
 
@@ -695,7 +697,7 @@ impl<H: Helper, I: History> Editor<H, I> {
         let mut stdout = self.term.create_writer();
 
         self.kill_ring.reset(); // TODO recreate a new kill ring vs reset
-        let ctx = Context::new(&self.history);
+        let ctx = Context::new(&self.history, self.overlay.map(|ov| ov.0));
 
         let mut s = State::new(&mut stdout, prompt, self.overlay, self.helper.as_ref(), ctx);
         let mut input_state = InputState::new(&self.config, &self.custom_bindings);

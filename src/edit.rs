@@ -83,10 +83,6 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         }
     }
 
-    pub fn overlayer(&self) -> Option<&dyn Overlayer> {
-        self.helper.map(|h| h as &dyn Overlayer)
-    }
-
     pub fn prompt_overlay(&self) -> Option<Overlay> {
         self.prompt_overlay
     }
@@ -174,6 +170,13 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         self.out.move_cursor_at_leftmost(rdr)
     }
 
+    fn overlay_for_leadchar(&self, leading_ch: Option<char>) -> Option<&'static str> {
+        match self.helper.map(|h| h as &dyn Overlayer) {
+            Some(overlayer) => overlayer.overlay_str(leading_ch),
+            _ => None,
+        }
+    }
+
     fn refresh(
         &mut self,
         prompt: &str,
@@ -193,12 +196,9 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         };
 
         let leadchr = self.starting_char();
-        let overlay = match self.overlayer() {
-            Some(prompter) => prompter.overlay_str(leadchr),
-            _ => None,
-        };
+        let overlay = self.overlay_for_leadchar(leadchr);
 
-        // calculate overlay size. use previous version if possible.
+        // calculate overlay size. use previous value if possible.
         let overlay_size = match overlay {
             Some(_) if self.prompt_overlay.map(|po| po.0) == leadchr => {
                 self.prompt_overlay.unwrap().2
@@ -233,6 +233,16 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
 
     pub fn hint(&mut self) {
         if let Some(hinter) = self.helper {
+            // Hints should be ignored when no other character (apart from
+            // overlay-triggering one) has been added. Context is used to convey
+            // information about leading char.
+            let leadchr = self.starting_char();
+            self.ctx.overlay_ch = if self.overlay_for_leadchar(leadchr).is_some() {
+                leadchr
+            } else {
+                None
+            };
+
             let hint = hinter.hint(self.line.as_str(), self.line.pos(), &self.ctx);
             self.hint = match hint {
                 Some(val) if !val.display().is_empty() => Some(Box::new(val) as Box<dyn Hint>),
@@ -402,6 +412,7 @@ impl<H: Helper> State<'_, '_, H> {
                     && self.layout.cursor.col + width < self.out.get_columns()
                     && (self.hint.is_none() && no_previous_hint) // TODO refresh only current line
                     && !self.highlight_char(CmdKind::Other)
+                    && self.overlay_for_leadchar(self.starting_char()).is_none()
                 {
                     // Avoid a full update of the line in the trivial case.
                     self.layout.cursor.col += width;
@@ -803,7 +814,7 @@ pub fn init_state<'out, H: Helper>(
         byte_buffer: [0; 4],
         changes: Changeset::new(),
         helper,
-        ctx: Context::new(history),
+        ctx: Context::new(history, None),
         hint: Some(Box::new("hint".to_owned())),
         highlight_char: false,
     }

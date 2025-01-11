@@ -16,7 +16,7 @@ struct MyHelper {
     #[rustyline(Hinter)]
     hinter: HistoryHinter,
     #[rustyline(Overlayer)]
-    prompter: JuliaOverlayer,
+    overlayer: JuliaOverlayer,
     colored_prompt: String,
 }
 
@@ -59,7 +59,7 @@ fn main() -> rustyline::Result<()> {
         completer: FilenameCompleter::new(),
         highlighter: MatchingBracketHighlighter::new(),
         hinter: HistoryHinter::new(),
-        prompter: JuliaOverlayer::new(),
+        overlayer: JuliaOverlayer::new(),
         colored_prompt: "".to_owned(),
     };
     let mut rl = Editor::with_config(config)?;
