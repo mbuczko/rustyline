@@ -166,11 +166,23 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         self.out.move_cursor_at_leftmost(rdr)
     }
 
-    fn overlay(&self, leading_ch: Option<char>) -> Option<&'static str> {
-        match self.helper.map(|h| h as &dyn Overlayer) {
+    fn overlay(&mut self) -> Option<&'static str> {
+        let leading_ch = self.starting_char();
+        let overlay = match self.helper.map(|h| h as &dyn Overlayer) {
             Some(overlayer) => overlayer.overlay_str(leading_ch),
             _ => None,
-        }
+        };
+        // calculate overlay size. use previous value if possible.
+        let overlay_size = match overlay {
+            Some(_) if self.prompt_overlay.map(|po| po.0) == leading_ch => {
+                self.prompt_overlay.unwrap().2
+            }
+            Some(ov) => self.out.calculate_position(ov, Position::default()),
+            _ => self.prompt_size,
+        };
+        self.line.set_printable_idx(overlay.is_some() as usize);
+        self.prompt_overlay = overlay.map(|ov| (leading_ch.unwrap(), ov, overlay_size));
+        overlay
     }
 
     fn refresh(
@@ -190,25 +202,13 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         } else {
             None
         };
-
-        let leadchr = self.starting_char();
-        let overlay = self.overlay(leadchr);
-
-        // calculate overlay size. use previous value if possible.
-        let overlay_size = match overlay {
-            Some(_) if self.prompt_overlay.map(|po| po.0) == leadchr => {
-                self.prompt_overlay.unwrap().2
-            }
-            Some(ov) => self.out.calculate_position(ov, Position::default()),
-            _ => prompt_size,
-        };
-
-        self.line.set_printable_idx(overlay.is_some() as usize);
-        self.prompt_overlay = overlay.map(|ov| (leadchr.unwrap(), ov, overlay_size));
-
+        let (prompt, prompt_size) = self
+            .prompt_overlay
+            .map(|ov| (ov.1, ov.2))
+            .unwrap_or((prompt, prompt_size));
         let new_layout = self.out.compute_layout(
-            self.prompt_overlay.map(|ov| ov.2).unwrap_or(prompt_size),
-            default_prompt & overlay.is_none(),
+            prompt_size,
+            default_prompt & self.prompt_overlay.is_none(),
             &self.line,
             info,
         );
@@ -216,7 +216,7 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         debug!(target: "rustyline", "old layout: {:?}", self.layout);
         debug!(target: "rustyline", "new layout: {:?}", new_layout);
         self.out.refresh_line(
-            overlay.unwrap_or(prompt),
+            prompt,
             &self.line,
             info,
             &self.layout,
@@ -229,16 +229,6 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
 
     pub fn hint(&mut self) {
         if let Some(hinter) = self.helper {
-            // Hints should be ignored when no other character (apart from
-            // overlay-triggering one) has been added. Context is used to convey
-            // information about leading char.
-            let leadchr = self.starting_char();
-            self.ctx.overlay_ch = if self.overlay(leadchr).is_some() {
-                leadchr
-            } else {
-                None
-            };
-
             let hint = hinter.hint(self.line.as_str(), self.line.pos(), &self.ctx);
             self.hint = match hint {
                 Some(val) if !val.display().is_empty() => Some(Box::new(val) as Box<dyn Hint>),
@@ -307,13 +297,16 @@ impl<H: Helper> Invoke for State<'_, '_, H> {
 
 impl<H: Helper> Refresher for State<'_, '_, H> {
     fn refresh_line(&mut self) -> Result<()> {
-        self.hint();
+        if self.overlay().is_none() || self.line.len() > 1 {
+            self.hint();
+        }
         self.highlight_char(CmdKind::Other);
         self.refresh(self.prompt, self.prompt_size, false, Info::Hint)
     }
 
     fn refresh_line_with_msg(&mut self, msg: Option<&str>, kind: CmdKind) -> Result<()> {
         let prompt_size = self.prompt_size;
+        self.overlay();
         self.hint = None;
         self.highlight_char(kind);
         self.refresh(self.prompt, prompt_size, true, Info::Msg(msg))
@@ -321,7 +314,9 @@ impl<H: Helper> Refresher for State<'_, '_, H> {
 
     fn refresh_prompt_and_line(&mut self, prompt: &str) -> Result<()> {
         let prompt_size = self.out.calculate_position(prompt, Position::default());
-        self.hint();
+        if self.overlay().is_none() || self.line.len() > 1 {
+            self.hint();
+        }
         self.highlight_char(CmdKind::Other);
         self.refresh(prompt, prompt_size, false, Info::Hint)
     }
@@ -401,14 +396,16 @@ impl<H: Helper> State<'_, '_, H> {
             if push {
                 let prompt_size = self.prompt_size;
                 let no_previous_hint = self.hint.is_none();
-                self.hint();
+                if self.line.len() > 1 || self.overlay().is_none() {
+                    self.hint();
+                }
                 let width = cwidh(ch);
                 if n == 1
                     && width != 0 // Ctrl-V + \t or \n ...
                     && self.layout.cursor.col + width < self.out.get_columns()
                     && (self.hint.is_none() && no_previous_hint) // TODO refresh only current line
                     && !self.highlight_char(CmdKind::Other)
-                    && self.overlay(self.starting_char()).is_none()
+                    && self.prompt_overlay.is_none()
                 {
                     // Avoid a full update of the line in the trivial case.
                     self.layout.cursor.col += width;
@@ -810,7 +807,7 @@ pub fn init_state<'out, H: Helper>(
         byte_buffer: [0; 4],
         changes: Changeset::new(),
         helper,
-        ctx: Context::new(history, None),
+        ctx: Context::new(history),
         hint: Some(Box::new("hint".to_owned())),
         highlight_char: false,
     }

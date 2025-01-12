@@ -56,13 +56,9 @@ impl Hinter for HistoryHinter {
     type Hint = String;
 
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<String> {
-        let och = ctx.overlay_ch;
         let len = line.len();
 
-        if line.is_empty()
-            || pos < len
-            || (och.is_some() && len == 1 && line.starts_with(och.unwrap()))
-        {
+        if line.is_empty() || pos < len {
             return None;
         }
         let start = if ctx.history_index() == ctx.history().len() {
@@ -93,7 +89,7 @@ mod test {
     #[test]
     pub fn empty_history() {
         let history = DefaultHistory::new();
-        let ctx = Context::new(&history, None);
+        let ctx = Context::new(&history);
         let hinter = HistoryHinter {};
         let hint = hinter.hint("test", 4, &ctx);
         assert_eq!(None, hint);
