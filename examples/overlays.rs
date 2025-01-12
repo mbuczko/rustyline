@@ -70,6 +70,14 @@ fn main() -> rustyline::Result<()> {
         println!("No previous history.");
     }
     let mut count = 1;
+
+    println!(
+        r##"
+    /)/)    Prompt overlays example.
+   (-.-)   
+  (")(")_o  Type "?" for help, "]" for packages.
+"##
+    );
     loop {
         let p = format!("{count}> ");
         rl.helper_mut().expect("No helper").colored_prompt = format!("\x1b[1;32m{p}\x1b[0m");

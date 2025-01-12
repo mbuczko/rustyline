@@ -35,8 +35,8 @@ impl Overlayer for () {
 impl Overlayer for JuliaOverlayer {
     fn overlay_str(&self, ch: Option<char>) -> Option<&'static str> {
         match ch {
-            Some(']') => Some("\x1b[35mpkg> \x1b[0m"),
-            Some('?') => Some("help> "),
+            Some(']') => Some("\x1b[36mpkg> \x1b[0m"),
+            Some('?') => Some("\x1b[33mhelp> \x1b[0m"),
             _ => None,
         }
     }
