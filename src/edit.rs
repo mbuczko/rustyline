@@ -29,7 +29,7 @@ pub struct State<'out, 'prompt, H: Helper> {
     pub out: &'out mut <Terminal as Term>::Writer,
     prompt: &'prompt str,  // Prompt to display (rl_prompt)
     prompt_size: Position, // Prompt Unicode/visible width and height
-    prompt_overlay: Option<Overlay>,
+    pub prompt_overlay: Option<Overlay>,
     pub line: LineBuffer, // Edited line buffer
     pub layout: Layout,
     saved_line_for_history: LineBuffer, // Current edited line before history browsing
@@ -81,10 +81,6 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         } else {
             None
         }
-    }
-
-    pub fn prompt_overlay(&self) -> Option<Overlay> {
-        self.prompt_overlay
     }
 
     pub fn next_cmd(
@@ -170,7 +166,7 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         self.out.move_cursor_at_leftmost(rdr)
     }
 
-    fn overlay_for_leadchar(&self, leading_ch: Option<char>) -> Option<&'static str> {
+    fn overlay(&self, leading_ch: Option<char>) -> Option<&'static str> {
         match self.helper.map(|h| h as &dyn Overlayer) {
             Some(overlayer) => overlayer.overlay_str(leading_ch),
             _ => None,
@@ -196,7 +192,7 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
         };
 
         let leadchr = self.starting_char();
-        let overlay = self.overlay_for_leadchar(leadchr);
+        let overlay = self.overlay(leadchr);
 
         // calculate overlay size. use previous value if possible.
         let overlay_size = match overlay {
@@ -237,7 +233,7 @@ impl<'out, 'prompt, H: Helper> State<'out, 'prompt, H> {
             // overlay-triggering one) has been added. Context is used to convey
             // information about leading char.
             let leadchr = self.starting_char();
-            self.ctx.overlay_ch = if self.overlay_for_leadchar(leadchr).is_some() {
+            self.ctx.overlay_ch = if self.overlay(leadchr).is_some() {
                 leadchr
             } else {
                 None
@@ -412,7 +408,7 @@ impl<H: Helper> State<'_, '_, H> {
                     && self.layout.cursor.col + width < self.out.get_columns()
                     && (self.hint.is_none() && no_previous_hint) // TODO refresh only current line
                     && !self.highlight_char(CmdKind::Other)
-                    && self.overlay_for_leadchar(self.starting_char()).is_none()
+                    && self.overlay(self.starting_char()).is_none()
                 {
                     // Avoid a full update of the line in the trivial case.
                     self.layout.cursor.col += width;

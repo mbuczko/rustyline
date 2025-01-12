@@ -801,7 +801,7 @@ impl<H: Helper, I: History> Editor<H, I> {
             let _ = original_mode; // silent warning
         }
         self.buffer = rdr.unbuffer();
-        self.overlay = s.prompt_overlay();
+        self.overlay = s.prompt_overlay;
         Ok(s.line.into_string())
     }
 
