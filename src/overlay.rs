@@ -12,6 +12,12 @@ pub trait Overlayer {
 /// Default implementation of `Overlayer` which mimics Julia REPL behaviour.
 pub struct JuliaOverlayer {}
 
+/// Implementation of generic overlayer with configurable triggers
+pub struct GenericOverlayer {
+    /// Vector of (trigger, overlay)
+    pub pairs: Vec<(char, &'static str)>,
+}
+
 impl Default for JuliaOverlayer {
     fn default() -> Self {
         Self::new()
@@ -39,5 +45,16 @@ impl Overlayer for JuliaOverlayer {
             Some('?') => Some("\x1b[33mhelp> \x1b[0m"),
             _ => None,
         }
+    }
+}
+
+impl Overlayer for GenericOverlayer {
+    fn overlay_str(&self, ch: Option<char>) -> Option<&'static str> {
+        self.pairs.iter().find_map(|(c, s)| {
+            if ch == Some(*c) {
+                return Some(*s);
+            }
+            None
+        })
     }
 }
