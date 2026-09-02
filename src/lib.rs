@@ -854,6 +854,18 @@ impl<H: Helper, I: History> Editor<H, I> {
         self.helper.as_ref()
     }
 
+    /// Forcibly escape the current prompt overlay: the next call to
+    /// `readline` will start with the default prompt instead of the
+    /// overlay prompt.
+    ///
+    /// Return `true` if an overlay was active.
+    ///
+    /// To escape an overlay during line edition, bind a key to
+    /// [`Cmd::EscapeOverlay`].
+    pub fn escape_overlay(&mut self) -> bool {
+        self.overlay.take().is_some()
+    }
+
     /// Bind a sequence to a command.
     #[cfg(feature = "custom-bindings")]
     #[cfg_attr(docsrs, doc(cfg(feature = "custom-bindings")))]

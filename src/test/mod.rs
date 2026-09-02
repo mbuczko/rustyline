@@ -159,6 +159,17 @@ fn assert_history(
 }
 
 #[test]
+fn escape_overlay() {
+    let mut editor = init_editor(EditMode::Emacs, &[]);
+    // no active overlay => no-op
+    assert!(!editor.escape_overlay());
+    // an overlay carried over from a previous `readline` is cleared
+    editor.overlay = Some(('?', "help> ", crate::layout::Position::default()));
+    assert!(editor.escape_overlay());
+    assert!(editor.overlay.is_none());
+}
+
+#[test]
 fn unknown_esc_key() {
     for mode in &[EditMode::Emacs, EditMode::Vi] {
         assert_line(*mode, &[E(K::UnknownEscSeq, M::NONE), E::ENTER], "");
