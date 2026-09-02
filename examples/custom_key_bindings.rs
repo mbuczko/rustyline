@@ -7,9 +7,9 @@ use rustyline::{
     Cmd, ConditionalEventHandler, Editor, Event, EventContext, EventHandler, KeyEvent, RepeatCount,
     Result,
 };
-use rustyline::{Completer, Helper, Hinter, Validator};
+use rustyline::{Completer, Helper, Hinter, Overlayer, Validator};
 
-#[derive(Completer, Helper, Hinter, Validator)]
+#[derive(Completer, Helper, Hinter, Overlayer, Validator)]
 struct MyHelper(#[rustyline(Hinter)] HistoryHinter);
 
 impl Highlighter for MyHelper {

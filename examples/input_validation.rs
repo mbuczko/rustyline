@@ -1,8 +1,8 @@
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
-use rustyline::{Completer, Helper, Highlighter, Hinter};
+use rustyline::{Completer, Helper, Highlighter, Hinter, Overlayer};
 use rustyline::{Editor, Result};
 
-#[derive(Completer, Helper, Highlighter, Hinter)]
+#[derive(Completer, Helper, Highlighter, Hinter, Overlayer)]
 struct InputValidator {}
 
 impl Validator for InputValidator {

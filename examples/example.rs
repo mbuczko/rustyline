@@ -6,9 +6,9 @@ use rustyline::highlight::{CmdKind, Highlighter, MatchingBracketHighlighter};
 use rustyline::hint::HistoryHinter;
 use rustyline::validate::MatchingBracketValidator;
 use rustyline::{Cmd, CompletionType, Config, EditMode, Editor, KeyEvent};
-use rustyline::{Completer, Helper, Hinter, Validator};
+use rustyline::{Completer, Helper, Hinter, Overlayer, Validator};
 
-#[derive(Helper, Completer, Hinter, Validator)]
+#[derive(Helper, Completer, Hinter, Validator, Overlayer)]
 struct MyHelper {
     #[rustyline(Completer)]
     completer: FilenameCompleter,

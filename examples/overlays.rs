@@ -76,6 +76,7 @@ fn main() -> rustyline::Result<()> {
     /)/)    Prompt overlays example.
    (-.-)   
   (")(")_o  Type "?" for help, "]" for packages.
+            Press Ctrl-O to escape an overlay.
 "##
     );
     loop {

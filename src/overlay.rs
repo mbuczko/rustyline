@@ -6,7 +6,9 @@ pub trait Overlayer {
     /// Takes an optional first character of command line and returns
     /// modified prompt.
     /// Returns `None` if no prompt modification should happen.
-    fn overlay_str(&self, ch: Option<char>) -> Option<&'static str>;
+    fn overlay_str(&self, _ch: Option<char>) -> Option<&'static str> {
+        None
+    }
 }
 
 /// Default implementation of `Overlayer` which mimics Julia REPL behaviour.

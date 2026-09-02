@@ -162,6 +162,10 @@ pub fn execute<H: Helper>(
             // move to last entry in history
             s.edit_history(false)?;
         }
+        Cmd::EscapeOverlay => {
+            // forcibly escape the current prompt overlay
+            s.edit_escape_overlay()?;
+        }
         Cmd::Move(Movement::BackwardWord(n, word_def)) => {
             // move backwards one word
             s.edit_move_to_prev_word(word_def, n)?;

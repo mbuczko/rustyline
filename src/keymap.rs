@@ -45,6 +45,9 @@ pub enum Cmd {
     EndOfFile,
     /// end-of-history
     EndOfHistory,
+    /// Remove the prompt overlay (if any) together with its leading
+    /// trigger character and restore the default prompt
+    EscapeOverlay,
     /// forward-search-history (incremental search)
     ForwardSearchHistory,
     /// history-search-backward (common prefix search)

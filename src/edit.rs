@@ -595,6 +595,25 @@ impl<H: Helper> State<'_, '_, H> {
         self.refresh_line()
     }
 
+    /// Forcibly escape the current prompt overlay: remove the leading
+    /// trigger character and restore the default prompt.
+    /// Return `true` if an overlay was active.
+    pub fn edit_escape_overlay(&mut self) -> Result<bool> {
+        let Some((trigger, ..)) = self.prompt_overlay else {
+            return Ok(false);
+        };
+        if self.line.as_str().starts_with(trigger) {
+            let len = trigger.len_utf8();
+            let pos = self.line.pos();
+            self.line.delete_range(0..len, &mut self.changes);
+            self.line.set_pos(pos.saturating_sub(len));
+        }
+        // The trigger is gone: `refresh_line` recomputes the overlay
+        // (which resets `prompt_overlay` and the printable index).
+        self.refresh_line()?;
+        Ok(true)
+    }
+
     /// Exchange the char before cursor with the character at cursor.
     pub fn edit_transpose_chars(&mut self) -> Result<()> {
         self.changes.begin();
@@ -817,7 +836,29 @@ pub fn init_state<'out, H: Helper>(
 mod test {
     use super::init_state;
     use crate::history::{DefaultHistory, History};
+    use crate::layout::Position;
     use crate::tty::Sink;
+
+    #[test]
+    fn escape_overlay() {
+        let mut out = Sink::default();
+        let history = DefaultHistory::new();
+        let helper: Option<()> = None;
+        let mut s = init_state(&mut out, "?foo", 3, helper.as_ref(), &history);
+        s.line.set_printable_idx(1);
+        s.prompt_overlay = Some(('?', "help> ", Position::default()));
+
+        // escaping removes the trigger char and the overlay
+        assert!(s.edit_escape_overlay().unwrap());
+        assert_eq!("foo", s.line.as_str());
+        assert_eq!(2, s.line.pos());
+        assert!(s.prompt_overlay.is_none());
+
+        // no active overlay => no-op
+        assert!(!s.edit_escape_overlay().unwrap());
+        assert_eq!("foo", s.line.as_str());
+        assert_eq!(2, s.line.pos());
+    }
 
     #[test]
     fn edit_history_next() {
