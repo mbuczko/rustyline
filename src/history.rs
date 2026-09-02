@@ -57,7 +57,7 @@ pub trait History {
     ///
     /// `SearchDirection` is useful only for implementations without direct
     /// indexing.
-    fn get(&self, index: usize, dir: SearchDirection) -> Result<Option<SearchResult>>;
+    fn get(&self, index: usize, dir: SearchDirection) -> Result<Option<SearchResult<'_>>>;
 
     // termwiz: fn last(&self) -> Option<HistoryIndex>;
 
@@ -161,7 +161,7 @@ pub trait History {
         term: &str,
         start: usize,
         dir: SearchDirection,
-    ) -> Result<Option<SearchResult>>;
+    ) -> Result<Option<SearchResult<'_>>>;
 
     /// Anchored search
     fn starts_with(
@@ -169,7 +169,7 @@ pub trait History {
         term: &str,
         start: usize,
         dir: SearchDirection,
-    ) -> Result<Option<SearchResult>>;
+    ) -> Result<Option<SearchResult<'_>>>;
 
     /* TODO How ? DoubleEndedIterator may be difficult to implement (for an SQLite backend)
     /// Return a iterator.
@@ -213,7 +213,7 @@ impl MemHistory {
         start: usize,
         dir: SearchDirection,
         test: F,
-    ) -> Option<SearchResult>
+    ) -> Option<SearchResult<'_>>
     where
         F: Fn(&str) -> Option<usize>,
     {
@@ -288,7 +288,7 @@ impl Default for MemHistory {
 }
 
 impl History for MemHistory {
-    fn get(&self, index: usize, _: SearchDirection) -> Result<Option<SearchResult>> {
+    fn get(&self, index: usize, _: SearchDirection) -> Result<Option<SearchResult<'_>>> {
         Ok(self
             .entries
             .get(index)
@@ -364,7 +364,7 @@ impl History for MemHistory {
         term: &str,
         start: usize,
         dir: SearchDirection,
-    ) -> Result<Option<SearchResult>> {
+    ) -> Result<Option<SearchResult<'_>>> {
         #[cfg(not(feature = "case_insensitive_history_search"))]
         {
             let test = |entry: &str| entry.find(term);
@@ -392,7 +392,7 @@ impl History for MemHistory {
         term: &str,
         start: usize,
         dir: SearchDirection,
-    ) -> Result<Option<SearchResult>> {
+    ) -> Result<Option<SearchResult<'_>>> {
         #[cfg(not(feature = "case_insensitive_history_search"))]
         {
             let test = |entry: &str| {
@@ -412,11 +412,8 @@ impl History for MemHistory {
                     .case_insensitive(true)
                     .build()
                 {
-                    let test = |entry: &str| {
-                        re.find(entry)
-                            .and_then(|m| if m.start() == 0 { Some(m) } else { None })
-                            .map(|m| m.end())
-                    };
+                    let test =
+                        |entry: &str| re.find(entry).filter(|&m| m.start() == 0).map(|m| m.end());
                     self.search_match(term, start, dir, test)
                 } else {
                     None
@@ -644,7 +641,7 @@ pub type DefaultHistory = FileHistory;
 
 #[cfg(feature = "with-file-history")]
 impl History for FileHistory {
-    fn get(&self, index: usize, dir: SearchDirection) -> Result<Option<SearchResult>> {
+    fn get(&self, index: usize, dir: SearchDirection) -> Result<Option<SearchResult<'_>>> {
         self.mem.get(index, dir)
     }
 
@@ -776,7 +773,7 @@ impl History for FileHistory {
         term: &str,
         start: usize,
         dir: SearchDirection,
-    ) -> Result<Option<SearchResult>> {
+    ) -> Result<Option<SearchResult<'_>>> {
         self.mem.search(term, start, dir)
     }
 
@@ -785,7 +782,7 @@ impl History for FileHistory {
         term: &str,
         start: usize,
         dir: SearchDirection,
-    ) -> Result<Option<SearchResult>> {
+    ) -> Result<Option<SearchResult<'_>>> {
         self.mem.starts_with(term, start, dir)
     }
 }

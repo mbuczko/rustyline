@@ -402,28 +402,24 @@ fn k() {
 
 #[test]
 fn ctrl_n() {
-    for key in &[E::ctrl('N')] {
-        assert_history(
-            EditMode::Vi,
-            &["line1", "line2"],
-            &[E::ESC, E::ctrl('P'), E::ctrl('P'), *key, E::ENTER],
-            "",
-            ("line2", ""),
-        );
-    }
+    assert_history(
+        EditMode::Vi,
+        &["line1", "line2"],
+        &[E::ESC, E::ctrl('P'), E::ctrl('P'), E::ctrl('N'), E::ENTER],
+        "",
+        ("line2", ""),
+    );
 }
 
 #[test]
 fn ctrl_p() {
-    for key in &[E::ctrl('P')] {
-        assert_history(
-            EditMode::Vi,
-            &["line1"],
-            &[E::ESC, *key, E::ENTER],
-            "",
-            ("line1", ""),
-        );
-    }
+    assert_history(
+        EditMode::Vi,
+        &["line1"],
+        &[E::ESC, E::ctrl('P'), E::ENTER],
+        "",
+        ("line1", ""),
+    );
 }
 
 #[test]

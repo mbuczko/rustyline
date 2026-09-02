@@ -308,14 +308,13 @@ fn ctrl_w() {
 
 #[test]
 fn ctrl_y() {
-    for mode in &[EditMode::Emacs /* FIXME, EditMode::Vi */] {
-        assert_cursor(
-            *mode,
-            ("Hello, ", "world"),
-            &[E::ctrl('W'), E::ctrl('Y'), E::ENTER],
-            ("Hello, ", "world"),
-        );
-    }
+    // FIXME EditMode::Vi
+    assert_cursor(
+        EditMode::Emacs,
+        ("Hello, ", "world"),
+        &[E::ctrl('W'), E::ctrl('Y'), E::ENTER],
+        ("Hello, ", "world"),
+    );
 }
 
 #[test]

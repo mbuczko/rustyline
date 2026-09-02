@@ -355,7 +355,7 @@ fn filename_complete(
 }
 
 #[cfg(any(windows, target_os = "macos"))]
-fn normalize(s: &str) -> Cow<str> {
+fn normalize(s: &str) -> Cow<'_, str> {
     // case insensitive
     Owned(s.to_lowercase())
 }
@@ -617,6 +617,7 @@ mod tests {
         impl Completer for ArcCmp {
             type Candidate = std::sync::Arc<str>;
         }
+        let _ = (StrCmp, RcCmp, ArcCmp);
     }
 
     #[test]
